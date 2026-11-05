@@ -28,7 +28,7 @@ Bench checks:
 - [x] Switch between long and short patterns while running. Check for stray
       pulses and verify RPM and phase after the switch.
 - [ ] Test fixed RPM, sweeps and compression, including sweep limits and
-      transitions. Use the updated GUI for dynamic amplitude (see README pre-existing fixes).
+      transitions. Dynamic amplitude retention remains unresolved (see README known issues).
 - [ ] Test the optional PA1 potentiometer across its 0–3.3 V range and confirm
       mode switching between potentiometer, fixed RPM and sweep operation.
 - [x] Save changed settings, reset and fully power cycle; verify the selected
@@ -65,7 +65,7 @@ Bench checks (use the pinout confirmed for this board):
 - [ ] Switch between long and short patterns while running. Check for stray
       pulses and verify RPM and phase after the switch.
 - [ ] Test fixed RPM, sweeps and compression, including sweep limits and
-      transitions. Use the updated GUI for dynamic amplitude (see README pre-existing fixes).
+      transitions. Dynamic amplitude retention remains unresolved (see README known issues).
 - [ ] Test the optional potentiometer on the confirmed ADC pin, within its
       documented voltage range. Switch between potentiometer, fixed RPM and sweep modes.
 - [ ] Save changed settings, reset and fully power cycle; verify the selected
@@ -106,7 +106,7 @@ Bench checks (use the pinout confirmed for this board):
 - [x] Switch between long and short patterns while running. Check for stray
       pulses and verify RPM and phase after the switch.
 - [ ] Test fixed RPM, sweeps and compression, including sweep limits and
-      transitions. Use the updated GUI for dynamic amplitude (see README pre-existing fixes).
+      transitions. Dynamic amplitude retention remains unresolved (see README known issues).
 - [x] Test the optional potentiometer on the confirmed ADC pin, within its
       documented voltage range. Switch between potentiometer, fixed RPM and sweep modes.
 - [x] Save changed settings, reset and fully power cycle; verify the selected
@@ -130,10 +130,15 @@ Bench checks (use the pinout confirmed for this board):
 - [ ] Scope all outputs: phase/skew, dense patterns/high RPM, USB traffic jitter.
 - [ ] Check pot range, sweep/compression, settings persistence and save pause/restart.
 
-## Pre-existing issue fixes — dynamic amplitude bench verification
+## Pre-existing issue — dynamic amplitude (deferred software and firmware fixes)
 
-Run with the updated GUI; AVR boards also need the updated firmware. Earlier
-settings-retention results above do not verify this checkbox fix.
+Application changes are outside the current firmware-only scope. The GUI packet
+correction and AVR persistence changes have been reverted. Earlier settings
+retention results above do not establish dynamic amplitude retention.
+
+- [ ] Future application work: correct the dynamic flag to byte 17 without
+      overwriting compression offset, then build and verify the GUI package.
+- [ ] Future AVR firmware work: add dynamic flag persistence.
 
 - [ ] Uno: complete the dynamic amplitude procedure below.
 - [ ] Nano: complete the dynamic amplitude procedure below.
@@ -141,6 +146,11 @@ settings-retention results above do not verify this checkbox fix.
 - [ ] F401 Black Pill: complete the procedure below.
 - [ ] ESP32-C3 Super Mini: complete the procedure below.
 - [ ] F411, when implemented: repeat the procedure before marking it supported.
+
+ESP32-C3 bench status: the user tested the downloaded AppImage and reported the
+setting lost after reset/power cycling. The GUI packet defect remains present;
+this test does not establish a separate ESP32 flash-storage defect. Keep the
+issue open and defer the following bench procedure until fixes are implemented.
 
 Procedure for each board (record firmware/GUI revision and measured results):
 

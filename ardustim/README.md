@@ -179,26 +179,26 @@ above using GPIO3/4/5, including dense patterns under repeated GUI commands,
 low cranking RPM, sweep/compression, changed and unchanged saves, power cycling,
 and USB disconnect/reconnect. Timer resolution does not establish actual jitter.
 
-## Pre-existing Ardu-Stim fixes unrelated to board additions
+## Pre-existing Ardu-Stim issues unrelated to board additions
 
-### Dynamic amplitude packet and persistence
+### Dynamic amplitude setting does not persist — unresolved
 
-The GUI previously wrote Dynamic amplitude into byte 16, overwriting the high
-byte of the two-byte compression offset (bytes 15–16). Firmware expects the flag
-in byte 17. `UI/renderer.js` now sends byte 17, preserving the offset and allowing
-all supported boards to receive the checkbox value correctly. Packet size and
-protocol version are unchanged. Run the updated GUI source or rebuild packaged
-GUI applications; an older installed GUI still sends the incorrect packet.
+Dynamic amplitude retention is not fixed. The downloaded AppImage was used for
+an ESP32-C3 bench test in which the setting was lost after reset/power cycling.
+The issue also requires a GUI software fix; firmware updates alone cannot
+correct the packet sent by the existing application.
 
-Original AVR firmware also omitted this flag from EEPROM saves and loads.
-Uno, Nano and Duemilanove now store and restore it at EEPROM address 20, matching
-F401 and ESP32-C3. An erased byte from older AVR settings defaults to disabled.
-F401/C3 already had persistence; their firmware storage behavior is unchanged.
-AVR users need updated firmware as well as the updated GUI.
+The existing GUI sends Dynamic amplitude in byte 16, overwriting the high byte
+of the two-byte compression offset (bytes 15–16). Firmware expects the flag in
+byte 17. The GUI correction has been reverted because application changes are
+outside the current firmware-only scope. No corrected AppImage is included.
 
-Regression checks exercise the actual GUI sender with the checkbox both ways
-and offsets 0, 255, 256 and 359, firmware packet reception/readback, and settings
-persistence through the AVR, F401 and C3 storage paths. Host checks do not prove
-physical flash/EEPROM retention or waveform behavior. Bench checks remain in
-TODO.md. Use Save before reset or power cycling; changing a checkbox alone only
-updates the running configuration.
+Original AVR firmware also omits this flag from EEPROM saves and loads. The
+attempted AVR persistence fix has been reverted; Uno, Nano and Duemilanove keep
+their prior behavior. F401 and ESP32-C3 retain the storage support included with
+their board backends, but this does not resolve the existing GUI packet issue.
+
+Future work must correct the GUI packet, add AVR persistence, and bench-test
+both checkbox states with compression offset retained across Save, reconnect,
+reset and full power cycling on every supported board. These checks remain
+pending in TODO.md. No end-to-end dynamic amplitude retention fix is claimed.

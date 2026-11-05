@@ -104,8 +104,9 @@ void loadConfig()
     if(config.compressionType > COMPRESSION_TYPE_8CYL_4STROKE) { config.compressionType = COMPRESSION_TYPE_4CYL_4STROKE; }
     if(config.compressionRPM > 1000) { config.compressionRPM = 400; }
     if(config.compressionOffset > 359) { config.compressionOffset = 0; }
-    // Older AVR firmware left this byte erased; only 1 means enabled.
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
     config.compressionDynamic = EEPROM.read(EEPROM_COMPRESSION_DYNAMIC) == 1;
+#endif
   }
 #if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
   currentStatus.base_rpm = currentStatus.rpm;
@@ -157,8 +158,8 @@ void saveConfig()
   lowByte = lowByte(config.compressionOffset);
   updateStorage(EEPROM_COMPRESSION_OFFSET, highByte);
   updateStorage(EEPROM_COMPRESSION_OFFSET+1, lowByte);
-  updateStorage(EEPROM_COMPRESSION_DYNAMIC, config.compressionDynamic);
 #if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+  updateStorage(EEPROM_COMPRESSION_DYNAMIC, config.compressionDynamic);
   if (storageChanged)
   {
     backendBeginSave();

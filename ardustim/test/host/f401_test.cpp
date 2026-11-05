@@ -104,19 +104,15 @@ int main()
   incoming.wheel = 6;
   incoming.mode = FIXED_RPM;
   incoming.fixed_rpm = 0x1234;
-  incoming.compressionDynamic = true;
-  incoming.compressionOffset = 359;
   edge_counter = 999;
   cycleDuration = 999;
   sendConfig(incoming);
   assert(config.fixed_rpm == 0x1234 && config.wheel == 6 && edge_counter == 0);
   assert(cycleDuration == 0 && timingUpdates == 1);
-  assert(config.compressionDynamic && config.compressionOffset == 359);
   Serial.receive({'C'});
   commandParser();
   assert(Serial.output.size() == 18);
   assert(Serial.output[3] == 0x34 && Serial.output[4] == 0x12);
-  assert(Serial.output[17] == 1 && Serial.output[15] == 0x67 && Serial.output[16] == 1);
   incoming.wheel = MAX_WHEELS;
   sendConfig(incoming);
   assert(config.wheel == 6 && timingUpdates == 1);
@@ -137,5 +133,6 @@ int main()
   commandParser();
   assert(config.sweep_low_rpm == 0x0123 && config.sweep_high_rpm == 0x2345);
   assert(config.sweep_interval == 0x0321 && config.mode == LINEAR_SWEPT_RPM);
+
   puts("Timing, GPIO mapping, serial protocol and buffered storage checks passed.");
 }
