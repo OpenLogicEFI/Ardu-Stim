@@ -1,0 +1,26 @@
+#pragma once
+#include <stdint.h>
+#include <stddef.h>
+#include <vector>
+#include <string.h>
+using byte = uint8_t;
+#define PROGMEM
+#define highByte(v) ((uint8_t)((v) >> 8))
+#define lowByte(v) ((uint8_t)(v))
+#define constrain(v, lo, hi) ((v) < (lo) ? (lo) : ((v) > (hi) ? (hi) : (v)))
+inline uint16_t word(uint8_t high, uint8_t low) { return (uint16_t(high) << 8) | low; }
+inline void noInterrupts() {}
+inline void interrupts() {}
+inline uint32_t micros() { return 1234; }
+struct TestSerial {
+  std::vector<uint8_t> input, output;
+  size_t offset = 0;
+  void begin(unsigned long) {}
+  int available() { return int(input.size() - offset); }
+  int read() { return offset < input.size() ? input[offset++] : -1; }
+  void write(uint8_t v) { output.push_back(v); }
+  template<typename T> void print(T) {}
+  template<typename T> void println(T) {}
+  void receive(std::vector<uint8_t> bytes) { input = bytes; offset = 0; output.clear(); }
+};
+extern TestSerial Serial;

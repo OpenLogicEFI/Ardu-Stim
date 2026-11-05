@@ -25,8 +25,11 @@
 #include "comms.h"
 #include "storage.h"
 #include "wheel_defs.h"
-#include <avr/pgmspace.h>
+#include "platform_compat.h"
 #include <EEPROM.h>
+#if defined(ARDUSTIM_F401)
+#include "f401_backend.h"
+#endif
 
 struct configTable config;
 struct status currentStatus;
@@ -129,6 +132,9 @@ void setup() {
   loadConfig();
   serialSetup();
 
+#if defined(ARDUSTIM_F401)
+  f401Setup();
+#else
   cli(); // stop interrupts
 
   /* Configuring TIMER1 (pattern generator) */
@@ -217,8 +223,12 @@ void setup() {
   sei(); // Enable interrupts
   // Set ADSC in ADCSRA (0x7A) to start the ADC conversion
   ADCSRA |= B01000000;
+#endif
   /* Make sure we are using the DEFAULT RPM on startup */
-  reset_new_OCR1A(currentStatus.rpm); 
+  reset_new_OCR1A(currentStatus.rpm);
+#if defined(ARDUSTIM_F401)
+  f401Start();
+#endif
 
 } // End setup
 
@@ -228,6 +238,7 @@ void setup() {
  * Reads ADC ports 0 and 1 alternately. Port 0 is RPM, Port 1 is for
  * future fun (possible wheel selection)
  */
+#if defined(__AVR__)
 ISR(ADC_vect){
   if (analog_port == 0)
   {
@@ -257,10 +268,22 @@ ISR(ADC_vect){
 /* Pumps the pattern out of flash to the port 
  * The rate at which this runs is dependent on what OCR1A is set to
  */
-ISR(TIMER1_COMPA_vect) 
+#endif
+#if defined(ARDUSTIM_F401)
+void patternTick()
+#else
+ISR(TIMER1_COMPA_vect)
+#endif
 {
   /* This is VERY simple, just walk the array and wrap when we hit the limit */
-  PORTB = output_invert_mask ^ pgm_read_byte(&Wheels[config.wheel].edge_states_ptr[edge_counter]);   /* Write it to the port */
+  // A serial wheel change can select a shorter table between timer interrupts.
+  if (edge_counter >= Wheels[config.wheel].wheel_max_edges) { edge_counter = 0; }
+  const uint8_t state = output_invert_mask ^ pgm_read_byte(&Wheels[config.wheel].edge_states_ptr[edge_counter]);
+#if defined(ARDUSTIM_F401)
+  f401WriteOutputs(state);
+#else
+  PORTB = state;
+#endif
   
   edge_counter++;
   if (edge_counter == Wheels[config.wheel].wheel_max_edges) 
@@ -271,6 +294,7 @@ ISR(TIMER1_COMPA_vect)
   }
   /* The tables are in flash so we need pgm_read_byte() */
 
+#if defined(__AVR__)
   /* Reset Prescaler only if flag is set */
   if (reset_prescaler)
   {
@@ -280,10 +304,14 @@ ISR(TIMER1_COMPA_vect)
   }
   /* Reset next compare value for RPM changes */
   OCR1A = new_OCR1A;  /* Apply new "RPM" from Timer2 ISR, i.e. speed up/down the virtual "wheel" */
+#endif
 }
 
 void loop() 
 {
+#if defined(ARDUSTIM_F401)
+  if (config.mode == POT_RPM) { f401PollADC(); }
+#endif
   uint16_t tmp_rpm = currentStatus.base_rpm;
   /* Just handle the Serial UI, everything else is in 
    * interrupt handlers or callbacks from SerialUI.
@@ -402,6 +430,9 @@ void setRPM(uint16_t newRPM)
 
 void reset_new_OCR1A(uint32_t new_rpm)
 {
+#if defined(ARDUSTIM_F401)
+  f401SetRPM(Wheels[config.wheel].rpm_scaler, new_rpm);
+#else
   uint32_t tmp;
   uint8_t bitshift;
   uint8_t tmp_prescaler_bits;
@@ -413,7 +444,8 @@ void reset_new_OCR1A(uint32_t new_rpm)
 
   new_OCR1A = (uint16_t)(tmp >> bitshift); 
   prescaler_bits = tmp_prescaler_bits;
-  reset_prescaler = true; 
+  reset_prescaler = true;
+#endif
 }
 
 

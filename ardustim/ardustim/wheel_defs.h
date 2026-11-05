@@ -21,7 +21,7 @@
  #ifndef __WHEEL_DEFS_H__
  #define __WHEEL_DEFS_H__
  
- #include <avr/pgmspace.h>
+ #include "platform_compat.h"
  
  /* Wheel patterns! 
   *

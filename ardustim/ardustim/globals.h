@@ -54,6 +54,7 @@ struct configTable
   uint16_t compressionOffset = 0;
   bool compressionDynamic = false;
 } __attribute__ ((packed));
+static_assert(sizeof(configTable) == 18, "GUI configuration wire format must remain 18 bytes");
 extern struct configTable config;
 
 

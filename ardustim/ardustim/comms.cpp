@@ -25,9 +25,11 @@
 #include "comms.h"
 #include "storage.h"
 #include "wheel_defs.h"
-#include <avr/pgmspace.h>
+#include "platform_compat.h"
 #include <math.h>
+#if defined(__AVR__)
 #include <util/delay.h>
+#endif
 
 /* External Globla Variables */
 extern wheels Wheels[];
@@ -36,6 +38,10 @@ extern wheels Wheels[];
 extern volatile bool normal;
 extern volatile uint16_t edge_counter;
 extern volatile uint16_t new_OCR1A;
+#if defined(ARDUSTIM_F401)
+extern volatile uint32_t cycleDuration;
+extern volatile uint32_t cycleStartTime;
+#endif
 
 bool cmdPending;
 byte currentCommand;
@@ -65,13 +71,22 @@ void commandParser()
       break;
 
     case 'c': //Receive a full config buffer
-      //uint8_t targetBytes = (sizeof(struct configTable)-1); //No byte is sent for the version
-      while(Serial.available() < (sizeof(struct configTable)-1) ) {} //Wait for all bytes
+    {
+      configTable receivedConfig = config;
+      while(Serial.available() < int(sizeof(configTable) - 1)) {} // Version is not sent
       for(uint8_t x=1; x<(sizeof(struct configTable)); x++)
       {
-        *((uint8_t *)pnt_Config + x) = Serial.read(); //Read each byte into the config table
+        *((uint8_t *)&receivedConfig + x) = Serial.read();
       }
+      if (receivedConfig.wheel >= MAX_WHEELS || receivedConfig.mode >= MAX_MODES) { break; }
+      const bool wheelChanged = receivedConfig.wheel != config.wheel;
+      // Publish a complete packet: the timer must never see a partial wheel/config.
+      noInterrupts();
+      config = receivedConfig;
+      interrupts();
+      if (wheelChanged) { display_new_wheel(); }
       break;
+    }
 
     case 'C': //Send the current config
       for(uint8_t x=0; x<sizeof(struct configTable); x++)
@@ -125,9 +140,16 @@ void commandParser()
       config.mode = LINEAR_SWEPT_RPM;
       while(Serial.available() < 6) {} //Wait for 4 bytes representing the new low and high RPMs
 
-      config.sweep_low_rpm = word(Serial.read(), Serial.read());
-      config.sweep_high_rpm = word(Serial.read(), Serial.read());
-      config.sweep_interval = word(Serial.read(), Serial.read());
+      // Read explicitly in wire order; C++ argument evaluation order varies by CPU.
+      for (uint8_t i = 0; i < 3; ++i)
+      {
+        const uint8_t high = Serial.read();
+        const uint8_t low = Serial.read();
+        const uint16_t value = word(high, low);
+        if (i == 0) { config.sweep_low_rpm = value; }
+        else if (i == 1) { config.sweep_high_rpm = value; }
+        else { config.sweep_interval = value; }
+      }
 
       //sweep_low_rpm = 100;
       //sweep_high_rpm = 4000;
@@ -165,11 +187,14 @@ void commandParser()
  * Figures out the amount of free RAM remaining nad returns it to the caller
  * \return amount of free memory
  */
+#if defined(__AVR__)
 uint16_t freeRam () {
   extern int __heap_start, *__brkval; 
   int v; 
   return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
 }
+
+#endif
 
 /* SerialUI Callbacks */
 //! Inverts the polarity of the primary output signal
@@ -189,8 +214,16 @@ void toggle_invert_secondary_cb()
 
 void display_new_wheel()
 {
+#if defined(ARDUSTIM_F401)
+  noInterrupts();
+#endif
   reset_new_OCR1A(currentStatus.rpm);
   edge_counter = 0; // Reset to beginning of the wheel pattern */
+#if defined(ARDUSTIM_F401)
+  cycleDuration = 0;
+  cycleStartTime = micros();
+  interrupts();
+#endif
 }
 
 

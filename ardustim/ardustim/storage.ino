@@ -4,6 +4,25 @@
 #include "ardustim.h"
 #include "enums.h"
 #include "globals.h"
+#if defined(ARDUSTIM_F401)
+#include "f401_backend.h"
+
+// Buffer the entire save and erase/program flash only once if anything changed.
+static bool storageChanged = false;
+static void updateStorage(int address, uint8_t value)
+{
+  if (eeprom_buffered_read_byte(address) != value)
+  {
+    eeprom_buffered_write_byte(address, value);
+    storageChanged = true;
+  }
+}
+#else
+static void updateStorage(int address, uint8_t value)
+{
+  EEPROM.update(address, value);
+}
+#endif
 
 void loadConfig()
 {
@@ -77,48 +96,67 @@ void loadConfig()
     if(config.compressionType > COMPRESSION_TYPE_8CYL_4STROKE) { config.compressionType = COMPRESSION_TYPE_4CYL_4STROKE; }
     if(config.compressionRPM > 1000) { config.compressionRPM = 400; }
     if(config.compressionOffset > 359) { config.compressionOffset = 0; }
+#if defined(ARDUSTIM_F401)
+    config.compressionDynamic = EEPROM.read(EEPROM_COMPRESSION_DYNAMIC) == 1;
+#endif
   }
+#if defined(ARDUSTIM_F401)
+  currentStatus.base_rpm = currentStatus.rpm;
+#endif
 }
 
 void saveConfig()
 {
-  EEPROM.update(EEPROM_WHEEL, config.wheel);
-  EEPROM.update(EEPROM_RPM_MODE, config.mode);
-  EEPROM.update(EEPROM_VERSION, VERSION);
+#if defined(ARDUSTIM_F401)
+  eeprom_buffer_fill();
+  storageChanged = false;
+#endif
+  updateStorage(EEPROM_WHEEL, config.wheel);
+  updateStorage(EEPROM_RPM_MODE, config.mode);
+  updateStorage(EEPROM_VERSION, VERSION);
 
   byte highByte = highByte(currentStatus.rpm);
   byte lowByte = lowByte(currentStatus.rpm);
-  EEPROM.update(EEPROM_CURRENT_RPM, highByte);
-  EEPROM.update(EEPROM_CURRENT_RPM+1, lowByte);
+  updateStorage(EEPROM_CURRENT_RPM, highByte);
+  updateStorage(EEPROM_CURRENT_RPM+1, lowByte);
 
   highByte = highByte(config.fixed_rpm);
   lowByte = lowByte(config.fixed_rpm);
-  EEPROM.update(EEPROM_FIXED_RPM, highByte);
-  EEPROM.update(EEPROM_FIXED_RPM+1, lowByte);
+  updateStorage(EEPROM_FIXED_RPM, highByte);
+  updateStorage(EEPROM_FIXED_RPM+1, lowByte);
 
   highByte = highByte(config.sweep_low_rpm);
   lowByte = lowByte(config.sweep_low_rpm);
-  EEPROM.update(EEPROM_SWEEP_RPM_MIN, highByte);
-  EEPROM.update(EEPROM_SWEEP_RPM_MIN+1, lowByte);
+  updateStorage(EEPROM_SWEEP_RPM_MIN, highByte);
+  updateStorage(EEPROM_SWEEP_RPM_MIN+1, lowByte);
 
   highByte = highByte(config.sweep_high_rpm);
   lowByte = lowByte(config.sweep_high_rpm);
-  EEPROM.update(EEPROM_SWEEP_RPM_MAX, highByte);
-  EEPROM.update(EEPROM_SWEEP_RPM_MAX+1, lowByte);
+  updateStorage(EEPROM_SWEEP_RPM_MAX, highByte);
+  updateStorage(EEPROM_SWEEP_RPM_MAX+1, lowByte);
 
   highByte = highByte(config.sweep_interval);
   lowByte = lowByte(config.sweep_interval);
-  EEPROM.update(EEPROM_SWEEP_RPM_INT, highByte);
-  EEPROM.update(EEPROM_SWEEP_RPM_INT+1, lowByte);
+  updateStorage(EEPROM_SWEEP_RPM_INT, highByte);
+  updateStorage(EEPROM_SWEEP_RPM_INT+1, lowByte);
 
-  EEPROM.update(EEPROM_USE_COMPRESSION, config.useCompression);
-  EEPROM.update(EEPROM_COMPRESSION_TYPE, config.compressionType);
+  updateStorage(EEPROM_USE_COMPRESSION, config.useCompression);
+  updateStorage(EEPROM_COMPRESSION_TYPE, config.compressionType);
   highByte = highByte(config.compressionRPM);
   lowByte = lowByte(config.compressionRPM);
-  EEPROM.update(EEPROM_COMPRESSION_RPM, highByte);
-  EEPROM.update(EEPROM_COMPRESSION_RPM+1, lowByte);
+  updateStorage(EEPROM_COMPRESSION_RPM, highByte);
+  updateStorage(EEPROM_COMPRESSION_RPM+1, lowByte);
   highByte = highByte(config.compressionOffset);
   lowByte = lowByte(config.compressionOffset);
-  EEPROM.update(EEPROM_COMPRESSION_OFFSET, highByte);
-  EEPROM.update(EEPROM_COMPRESSION_OFFSET+1, lowByte);
+  updateStorage(EEPROM_COMPRESSION_OFFSET, highByte);
+  updateStorage(EEPROM_COMPRESSION_OFFSET+1, lowByte);
+#if defined(ARDUSTIM_F401)
+  updateStorage(EEPROM_COMPRESSION_DYNAMIC, config.compressionDynamic);
+  if (storageChanged)
+  {
+    f401BeginSave();
+    eeprom_buffer_flush();
+    f401EndSave();
+  }
+#endif
 }
