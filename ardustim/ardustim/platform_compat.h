@@ -7,6 +7,11 @@
 #error "ARDUSTIM_F401 requires the STM32F401CC Black Pill target"
 #endif
 #include <avr/pgmspace.h> // STM32duino supplies the Arduino flash-access compatibility API
+#elif defined(ARDUSTIM_ESP32C3)
+#if !defined(CONFIG_IDF_TARGET_ESP32C3)
+#error "ARDUSTIM_ESP32C3 requires an ESP32-C3 target"
+#endif
+#include <pgmspace.h>
 #elif defined(__AVR__)
 #include <avr/pgmspace.h>
 #else

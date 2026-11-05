@@ -4,16 +4,24 @@
 #include "ardustim.h"
 #include "enums.h"
 #include "globals.h"
-#if defined(ARDUSTIM_F401)
-#include "f401_backend.h"
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+#include "pattern_backend.h"
 
 // Buffer the entire save and erase/program flash only once if anything changed.
 static bool storageChanged = false;
 static void updateStorage(int address, uint8_t value)
 {
+#if defined(ARDUSTIM_ESP32C3)
+  if (EEPROM.read(address) != value)
+#else
   if (eeprom_buffered_read_byte(address) != value)
+#endif
   {
+#if defined(ARDUSTIM_ESP32C3)
+    EEPROM.write(address, value);
+#else
     eeprom_buffered_write_byte(address, value);
+#endif
     storageChanged = true;
   }
 }
@@ -96,11 +104,10 @@ void loadConfig()
     if(config.compressionType > COMPRESSION_TYPE_8CYL_4STROKE) { config.compressionType = COMPRESSION_TYPE_4CYL_4STROKE; }
     if(config.compressionRPM > 1000) { config.compressionRPM = 400; }
     if(config.compressionOffset > 359) { config.compressionOffset = 0; }
-#if defined(ARDUSTIM_F401)
+    // Older AVR firmware left this byte erased; only 1 means enabled.
     config.compressionDynamic = EEPROM.read(EEPROM_COMPRESSION_DYNAMIC) == 1;
-#endif
   }
-#if defined(ARDUSTIM_F401)
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
   currentStatus.base_rpm = currentStatus.rpm;
 #endif
 }
@@ -150,13 +157,18 @@ void saveConfig()
   lowByte = lowByte(config.compressionOffset);
   updateStorage(EEPROM_COMPRESSION_OFFSET, highByte);
   updateStorage(EEPROM_COMPRESSION_OFFSET+1, lowByte);
-#if defined(ARDUSTIM_F401)
   updateStorage(EEPROM_COMPRESSION_DYNAMIC, config.compressionDynamic);
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
   if (storageChanged)
   {
-    f401BeginSave();
+    backendBeginSave();
+#if defined(ARDUSTIM_ESP32C3)
+    // Keep dirty RAM contents on failure; a later Save retries the commit.
+    storageChanged = !EEPROM.commit();
+#else
     eeprom_buffer_flush();
-    f401EndSave();
+#endif
+    backendEndSave();
   }
 #endif
 }

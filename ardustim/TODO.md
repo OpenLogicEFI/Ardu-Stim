@@ -28,8 +28,7 @@ Bench checks:
 - [x] Switch between long and short patterns while running. Check for stray
       pulses and verify RPM and phase after the switch.
 - [ ] Test fixed RPM, sweeps and compression, including sweep limits and
-      transitions. Test dynamic compression only with the corrected
-      GUI packet or a direct packet (see README protocol note).
+      transitions. Use the updated GUI for dynamic amplitude (see README pre-existing fixes).
 - [ ] Test the optional PA1 potentiometer across its 0–3.3 V range and confirm
       mode switching between potentiometer, fixed RPM and sweep operation.
 - [x] Save changed settings, reset and fully power cycle; verify the selected
@@ -66,8 +65,7 @@ Bench checks (use the pinout confirmed for this board):
 - [ ] Switch between long and short patterns while running. Check for stray
       pulses and verify RPM and phase after the switch.
 - [ ] Test fixed RPM, sweeps and compression, including sweep limits and
-      transitions. Test dynamic compression only with the corrected
-      GUI packet or a direct packet (see README protocol note).
+      transitions. Use the updated GUI for dynamic amplitude (see README pre-existing fixes).
 - [ ] Test the optional potentiometer on the confirmed ADC pin, within its
       documented voltage range. Switch between potentiometer, fixed RPM and sweep modes.
 - [ ] Save changed settings, reset and fully power cycle; verify the selected
@@ -97,22 +95,21 @@ Bench checks (use the pinout confirmed for this board):
 
 Bench checks (use the pinout confirmed for this board):
 
-- [ ] Connect to the GUI and check settings reads and RPM adjustment.
+- [x] Connect to the GUI and check settings reads and RPM adjustment.
 
-- [ ] Measure crank, CAM1 and CAM2 signal levels and timing with a
+- [x] Measure crank, CAM1 and CAM2 signal levels and timing with a
       scope or logic analyzer. With BMW N20, CAM1 and CAM2 should match.
 - [ ] Check 60-2 at 3000 RPM: approximately 166.67 us per table sample and 20 ms
       per crank revolution. Compare cam pulse positions with their pattern tables.
 - [ ] Test low cranking RPM and dense patterns at high RPM. Record the highest
       reliable RPM and check timing while sending repeated GUI commands.
-- [ ] Switch between long and short patterns while running. Check for stray
+- [x] Switch between long and short patterns while running. Check for stray
       pulses and verify RPM and phase after the switch.
 - [ ] Test fixed RPM, sweeps and compression, including sweep limits and
-      transitions. Test dynamic compression only with the corrected
-      GUI packet or a direct packet (see README protocol note).
-- [ ] Test the optional potentiometer on the confirmed ADC pin, within its
+      transitions. Use the updated GUI for dynamic amplitude (see README pre-existing fixes).
+- [x] Test the optional potentiometer on the confirmed ADC pin, within its
       documented voltage range. Switch between potentiometer, fixed RPM and sweep modes.
-- [ ] Save changed settings, reset and fully power cycle; verify the selected
+- [x] Save changed settings, reset and fully power cycle; verify the selected
       trigger, base RPM, mode, sweep and compression settings are restored.
 - [ ] Check output behavior during a changed save against the documented storage
       behavior. Confirm outputs and USB/GUI controls recover afterward.
@@ -123,3 +120,39 @@ Bench checks (use the pinout confirmed for this board):
 - [ ] Confirm the documented upload and recovery steps work repeatedly, and
       check normal startup afterward.
 - [ ] Re-run host regression checks and all existing AVR builds after any fixes.
+
+## ESP32-C3 Super Mini
+
+- [x] Add pinned PlatformIO target and native USB Serial/JTAG upload configuration.
+- [x] Add three-output timer backend, optional pot, and buffered settings commits.
+- [x] Compile C3 and existing AVR/F401 targets; run shared host protocol/storage checks.
+- [ ] Physical USB upload/recovery and GUI reconnect testing.
+- [ ] Scope all outputs: phase/skew, dense patterns/high RPM, USB traffic jitter.
+- [ ] Check pot range, sweep/compression, settings persistence and save pause/restart.
+
+## Pre-existing issue fixes — dynamic amplitude bench verification
+
+Run with the updated GUI; AVR boards also need the updated firmware. Earlier
+settings-retention results above do not verify this checkbox fix.
+
+- [ ] Uno: complete the dynamic amplitude procedure below.
+- [ ] Nano: complete the dynamic amplitude procedure below.
+- [ ] Duemilanove/Diecimila ATmega328: complete the procedure below.
+- [ ] F401 Black Pill: complete the procedure below.
+- [ ] ESP32-C3 Super Mini: complete the procedure below.
+- [ ] F411, when implemented: repeat the procedure before marking it supported.
+
+Procedure for each board (record firmware/GUI revision and measured results):
+
+1. Enable compression, set a nonzero offset (including 359 degrees), then enable
+   Dynamic amplitude. Read configuration back or reconnect the GUI and confirm
+   both fields retain their values. Repeat with Dynamic amplitude disabled.
+2. For each checkbox state, Save, reset, reconnect, then fully power cycle and
+   reconnect. Confirm the checkbox and compression offset are restored together.
+3. At fixed RPM below the compression RPM, scope a suitable crank pattern with
+   compression enabled. Compare dynamic enabled/disabled at two different low
+   RPMs; confirm the modulation amplitude changes as intended and the saved
+   setting produces the same behavior after reboot.
+4. On AVR, confirm an older settings image with address 20 erased loads Dynamic
+   amplitude disabled; then Save enabled and verify retention. Preserve any
+   settings needed before deliberately loading an older image.

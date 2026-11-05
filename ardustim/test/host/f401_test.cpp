@@ -20,6 +20,10 @@ volatile uint16_t edge_counter = 0, new_OCR1A = 0;
 volatile uint32_t cycleDuration = 0, cycleStartTime = 0;
 uint8_t output_invert_mask = 0;
 void reset_new_OCR1A(uint32_t) { ++timingUpdates; }
+#if defined(ARDUSTIM_ESP32C3)
+void backendBeginSave() { ++saveBegins; }
+void backendEndSave() { ++saveEnds; }
+#endif
 void f401BeginSave() { ++saveBegins; }
 void f401EndSave() { ++saveEnds; }
 
@@ -60,6 +64,10 @@ int main()
   // Default initialization, one flash transaction, unchanged saves, and reboot.
   memset(testFlash, 255, sizeof(testFlash));
   testFlash[99] = 42; // Unrelated data in the emulated EEPROM must survive.
+#if defined(ARDUSTIM_ESP32C3)
+  EEPROM.begin(32);
+  assert(patternPeriodTicks(10000000, 1.0f, 3000) == 1667);
+#endif
   loadConfig();
   assert(testFlushes == 1 && config.mode == POT_RPM && config.wheel < MAX_WHEELS);
   saveConfig();
@@ -76,20 +84,39 @@ int main()
   assert(config.fixed_rpm == 4321 && config.compressionDynamic);
   assert(currentStatus.rpm == 3210 && currentStatus.base_rpm == 3210);
 
+#if defined(ARDUSTIM_ESP32C3)
+  EEPROM.failCommit = true;
+  config.fixed_rpm = 4567;
+  saveConfig();
+  assert(testFlushes == 2);
+  EEPROM.failCommit = false;
+  saveConfig(); // Same values in RAM must still retry the failed commit.
+  assert(testFlushes == 3);
+  EEPROM.begin(32);
+  loadConfig();
+  assert(config.fixed_rpm == 4567);
+  saveConfig();
+  assert(testFlushes == 3);
+#endif
+
   // Existing GUI binary packet remains exactly 18 bytes, little endian.
   configTable incoming = config;
   incoming.wheel = 6;
   incoming.mode = FIXED_RPM;
   incoming.fixed_rpm = 0x1234;
+  incoming.compressionDynamic = true;
+  incoming.compressionOffset = 359;
   edge_counter = 999;
   cycleDuration = 999;
   sendConfig(incoming);
   assert(config.fixed_rpm == 0x1234 && config.wheel == 6 && edge_counter == 0);
   assert(cycleDuration == 0 && timingUpdates == 1);
+  assert(config.compressionDynamic && config.compressionOffset == 359);
   Serial.receive({'C'});
   commandParser();
   assert(Serial.output.size() == 18);
   assert(Serial.output[3] == 0x34 && Serial.output[4] == 0x12);
+  assert(Serial.output[17] == 1 && Serial.output[15] == 0x67 && Serial.output[16] == 1);
   incoming.wheel = MAX_WHEELS;
   sendConfig(incoming);
   assert(config.wheel == 6 && timingUpdates == 1);
@@ -110,5 +137,5 @@ int main()
   commandParser();
   assert(config.sweep_low_rpm == 0x0123 && config.sweep_high_rpm == 0x2345);
   assert(config.sweep_interval == 0x0321 && config.mode == LINEAR_SWEPT_RPM);
-  puts("F401 timing, GPIO, serial protocol and buffered storage checks passed.");
+  puts("Timing, GPIO mapping, serial protocol and buffered storage checks passed.");
 }

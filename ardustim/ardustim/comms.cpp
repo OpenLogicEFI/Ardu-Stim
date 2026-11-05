@@ -38,7 +38,7 @@ extern wheels Wheels[];
 extern volatile bool normal;
 extern volatile uint16_t edge_counter;
 extern volatile uint16_t new_OCR1A;
-#if defined(ARDUSTIM_F401)
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
 extern volatile uint32_t cycleDuration;
 extern volatile uint32_t cycleStartTime;
 #endif
@@ -214,12 +214,12 @@ void toggle_invert_secondary_cb()
 
 void display_new_wheel()
 {
-#if defined(ARDUSTIM_F401)
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
   noInterrupts();
 #endif
   reset_new_OCR1A(currentStatus.rpm);
   edge_counter = 0; // Reset to beginning of the wheel pattern */
-#if defined(ARDUSTIM_F401)
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
   cycleDuration = 0;
   cycleStartTime = micros();
   interrupts();

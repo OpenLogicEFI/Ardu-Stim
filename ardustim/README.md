@@ -80,12 +80,6 @@ settings. Reflashing with a full-chip erase clears the stored settings.
   8 KiB buffer inside the reserved 128 KiB sector; the entire sector is erased
   during a changed save. Do not allocate firmware or other data there.
 
-The existing GUI currently puts `compressionDynamic` in byte 16 of its outgoing
-packet, overlapping the high byte of `compressionOffset`; firmware expects it in
-byte 17. This pre-existing GUI issue is outside this firmware change. Ordinary
-pattern, RPM and sweep commands retain their protocol; testing that checkbox
-needs a corrected GUI or a directly constructed configuration packet.
-
 ## Verification
 
 ```sh
@@ -115,3 +109,96 @@ For the first board test, use a scope or logic analyzer on PB0-PB2:
 
 Start in fixed RPM mode if no potentiometer is attached; the initial stored
 defaults select potentiometer mode.
+
+## ESP32-C3 Super Mini (experimental)
+
+The `esp32c3_supermini` target supports the common **4 MiB ESP32-C3 Super Mini**.
+It uses the DevKitM-1 build definition with explicit Super Mini pins; it does not
+use the DevKit's LED or UART connections. ESP32-S3/C6 boards are different targets.
+
+| Function | Super Mini pin |
+| --- | --- |
+| Crank | GPIO3 |
+| Cam 1 | GPIO4 |
+| Cam 2 | GPIO5 |
+| Optional RPM pot wiper | GPIO0 |
+| Pot ends | 3V3 and GND |
+| GUI and firmware upload | Board USB-C connector |
+
+Outputs are 3.3 V push-pull, not 5 V tolerant. Use a suitable buffer for 5 V
+receivers, keep analog input within 0–3.3 V, and connect a common ground.
+GPIO2/8/9 (boot straps), GPIO8's usual LED, and GPIO18/19 (USB) are left alone.
+Confirm your seller's pinout because Super Mini clones vary. ADC attenuation is
+11 dB and readings are scaled to 10 bits; the C3 ADC can saturate below 3.3 V,
+so this is an RPM control rather than a precision voltage measurement.
+
+### USB upload
+
+**The C3 cannot use USB DFU.** Its built-in USB Serial/JTAG bootloader supports
+`esptool` uploads over the board USB connector, without an external programmer.
+See [Espressif's USB Serial/JTAG documentation](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-guides/usb-serial-jtag-console.html).
+The STM32 target continues to use DFU.
+
+```sh
+pio run -e esp32c3_supermini
+pio run -e esp32c3_supermini -t upload --upload-port /dev/ttyACM0
+```
+
+Replace the port with the actual board port (Windows: `COMx`). Close the GUI or
+serial monitor before uploading. For first upload or recovery, hold **BOOT**,
+press and release **RESET**, then release BOOT. Upload, then press RESET with
+BOOT released if the board remains in download mode. Subsequent uploads can
+normally enter download mode automatically over USB. Use a USB data cable.
+
+After reset select the board's USB serial port in the existing GUI at 115200.
+The 18-byte configuration protocol is unchanged. Use PlatformIO for uploading;
+the GUI's Nano upload button does not upload ESP32 firmware. No GUI changes are
+included. Start in fixed RPM mode without a pot; fresh settings select pot mode.
+
+### Backend and validation
+
+`ardustim/pattern_backend.h` maps shared operations to F401 or C3 implementations.
+`ardustim/esp32c3_backend.cpp` uses timer group 0/timer 0 at 10 MHz. Absolute alarm
+deadlines avoid accumulating callback latency, and RPM changes apply when the
+next alarm is scheduled. If an interrupt overruns its next deadline, it schedules
+one full interval ahead rather than producing a burst of catch-up samples.
+GPIO3–5 use masked clear/set writes; unlike F401 BSRR, falling and rising edges
+on different outputs have a small inter-write skew. No Wi-Fi/Bluetooth stacks
+are started. The interrupt and pattern tables are flash-backed, not IRAM-safe.
+
+Settings use a 32-byte EEPROM emulation buffer with one commit per changed save.
+Outputs pause low during commit and restart at sample zero; unchanged saves do
+not pause. A failed commit remains pending for the next Save. Saving is not a
+power-loss-safe transaction and may delay GUI responses. Do not add runtime
+flash writes or radio features without reviewing interrupt/cache behavior.
+
+C3 builds and host serial/storage regression tests pass. Hardware upload, GUI,
+settings retention, potentiometer behavior, three-output phase/skew and maximum
+reliable RPM remain unverified. Before relying on it, repeat the F401 scope tests
+above using GPIO3/4/5, including dense patterns under repeated GUI commands,
+low cranking RPM, sweep/compression, changed and unchanged saves, power cycling,
+and USB disconnect/reconnect. Timer resolution does not establish actual jitter.
+
+## Pre-existing Ardu-Stim fixes unrelated to board additions
+
+### Dynamic amplitude packet and persistence
+
+The GUI previously wrote Dynamic amplitude into byte 16, overwriting the high
+byte of the two-byte compression offset (bytes 15–16). Firmware expects the flag
+in byte 17. `UI/renderer.js` now sends byte 17, preserving the offset and allowing
+all supported boards to receive the checkbox value correctly. Packet size and
+protocol version are unchanged. Run the updated GUI source or rebuild packaged
+GUI applications; an older installed GUI still sends the incorrect packet.
+
+Original AVR firmware also omitted this flag from EEPROM saves and loads.
+Uno, Nano and Duemilanove now store and restore it at EEPROM address 20, matching
+F401 and ESP32-C3. An erased byte from older AVR settings defaults to disabled.
+F401/C3 already had persistence; their firmware storage behavior is unchanged.
+AVR users need updated firmware as well as the updated GUI.
+
+Regression checks exercise the actual GUI sender with the checkbox both ways
+and offsets 0, 255, 256 and 359, firmware packet reception/readback, and settings
+persistence through the AVR, F401 and C3 storage paths. Host checks do not prove
+physical flash/EEPROM retention or waveform behavior. Bench checks remain in
+TODO.md. Use Save before reset or power cycling; changing a checkbox alone only
+updates the running configuration.

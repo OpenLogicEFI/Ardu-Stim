@@ -27,8 +27,8 @@
 #include "wheel_defs.h"
 #include "platform_compat.h"
 #include <EEPROM.h>
-#if defined(ARDUSTIM_F401)
-#include "f401_backend.h"
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+#include "pattern_backend.h"
 #endif
 
 struct configTable config;
@@ -129,11 +129,15 @@ wheels Wheels[MAX_WHEELS] = {
 
 /* Initialization */
 void setup() {
+#if defined(ARDUSTIM_ESP32C3)
+  // ESP32 EEPROM emulation requires an allocated RAM buffer before any reads.
+  if (!EEPROM.begin(32)) { while (true) { delay(1000); } }
+#endif
   loadConfig();
   serialSetup();
 
-#if defined(ARDUSTIM_F401)
-  f401Setup();
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+  backendSetup();
 #else
   cli(); // stop interrupts
 
@@ -226,8 +230,8 @@ void setup() {
 #endif
   /* Make sure we are using the DEFAULT RPM on startup */
   reset_new_OCR1A(currentStatus.rpm);
-#if defined(ARDUSTIM_F401)
-  f401Start();
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+  backendStart();
 #endif
 
 } // End setup
@@ -269,7 +273,7 @@ ISR(ADC_vect){
  * The rate at which this runs is dependent on what OCR1A is set to
  */
 #endif
-#if defined(ARDUSTIM_F401)
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
 void patternTick()
 #else
 ISR(TIMER1_COMPA_vect)
@@ -279,8 +283,8 @@ ISR(TIMER1_COMPA_vect)
   // A serial wheel change can select a shorter table between timer interrupts.
   if (edge_counter >= Wheels[config.wheel].wheel_max_edges) { edge_counter = 0; }
   const uint8_t state = output_invert_mask ^ pgm_read_byte(&Wheels[config.wheel].edge_states_ptr[edge_counter]);
-#if defined(ARDUSTIM_F401)
-  f401WriteOutputs(state);
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+  backendWriteOutputs(state);
 #else
   PORTB = state;
 #endif
@@ -309,8 +313,8 @@ ISR(TIMER1_COMPA_vect)
 
 void loop() 
 {
-#if defined(ARDUSTIM_F401)
-  if (config.mode == POT_RPM) { f401PollADC(); }
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+  if (config.mode == POT_RPM) { backendPollADC(); }
 #endif
   uint16_t tmp_rpm = currentStatus.base_rpm;
   /* Just handle the Serial UI, everything else is in 
@@ -430,8 +434,8 @@ void setRPM(uint16_t newRPM)
 
 void reset_new_OCR1A(uint32_t new_rpm)
 {
-#if defined(ARDUSTIM_F401)
-  f401SetRPM(Wheels[config.wheel].rpm_scaler, new_rpm);
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+  backendSetRPM(Wheels[config.wheel].rpm_scaler, new_rpm);
 #else
   uint32_t tmp;
   uint8_t bitshift;

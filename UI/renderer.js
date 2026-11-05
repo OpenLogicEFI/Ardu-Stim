@@ -292,7 +292,7 @@ function sendConfig()
   configBuffer[12] = parseInt(document.getElementById('compressionMode').value);
   configBuffer.writeUInt16LE(parseInt(document.getElementById('compressionRPM').value), 13);
   configBuffer.writeUInt16LE(parseInt(document.getElementById('compressionOffset').value), 15);
-  configBuffer[16] = document.getElementById('compressionDynamic').checked;
+  configBuffer[17] = document.getElementById('compressionDynamic').checked;
 
   console.log("Sending full config: ", configBuffer);
 
