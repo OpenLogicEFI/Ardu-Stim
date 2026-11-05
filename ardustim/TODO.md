@@ -28,11 +28,13 @@ Bench checks:
 - [x] Switch between long and short patterns while running. Check for stray
       pulses and verify RPM and phase after the switch.
 - [ ] Test fixed RPM, sweeps and compression, including sweep limits and
-      transitions. Dynamic amplitude retention remains unresolved (see README known issues).
+      transitions. Ignore the known dynamic amplitude retention issue during
+      board validation; it is deferred and does not block board testing (see README).
 - [ ] Test the optional PA1 potentiometer across its 0–3.3 V range and confirm
       mode switching between potentiometer, fixed RPM and sweep operation.
 - [x] Save changed settings, reset and fully power cycle; verify the selected
-      trigger, base RPM, mode, sweep and compression settings are restored.
+      trigger, base RPM, mode, sweep and compression settings are restored,
+      excluding the deferred dynamic amplitude setting.
 - [ ] Observe the intentional output-low gap during a changed save and the
       restart at sample zero; confirm USB/GUI operation recovers afterward.
 - [ ] Repeat an unchanged save and confirm there is no flash-induced output gap.
@@ -65,11 +67,13 @@ Bench checks (use the pinout confirmed for this board):
 - [ ] Switch between long and short patterns while running. Check for stray
       pulses and verify RPM and phase after the switch.
 - [ ] Test fixed RPM, sweeps and compression, including sweep limits and
-      transitions. Dynamic amplitude retention remains unresolved (see README known issues).
+      transitions. Ignore the known dynamic amplitude retention issue during
+      board validation; it is deferred and does not block board testing (see README).
 - [ ] Test the optional potentiometer on the confirmed ADC pin, within its
       documented voltage range. Switch between potentiometer, fixed RPM and sweep modes.
 - [ ] Save changed settings, reset and fully power cycle; verify the selected
-      trigger, base RPM, mode, sweep and compression settings are restored.
+      trigger, base RPM, mode, sweep and compression settings are restored,
+      excluding the deferred dynamic amplitude setting.
 - [ ] Observe the intentional output-low gap during a changed save and the
       restart at sample zero; confirm USB/GUI operation recovers afterward.
 - [ ] Repeat an unchanged save and confirm there is no flash-induced output gap.
@@ -106,11 +110,13 @@ Bench checks (use the pinout confirmed for this board):
 - [x] Switch between long and short patterns while running. Check for stray
       pulses and verify RPM and phase after the switch.
 - [ ] Test fixed RPM, sweeps and compression, including sweep limits and
-      transitions. Dynamic amplitude retention remains unresolved (see README known issues).
+      transitions. Ignore the known dynamic amplitude retention issue during
+      board validation; it is deferred and does not block board testing (see README).
 - [x] Test the optional potentiometer on the confirmed ADC pin, within its
       documented voltage range. Switch between potentiometer, fixed RPM and sweep modes.
 - [x] Save changed settings, reset and fully power cycle; verify the selected
-      trigger, base RPM, mode, sweep and compression settings are restored.
+      trigger, base RPM, mode, sweep and compression settings are restored,
+      excluding the deferred dynamic amplitude setting.
 - [ ] Check output behavior during a changed save against the documented storage
       behavior. Confirm outputs and USB/GUI controls recover afterward.
 - [ ] Repeat an unchanged save and check that it skips unnecessary flash writes
@@ -128,13 +134,16 @@ Bench checks (use the pinout confirmed for this board):
 - [x] Compile C3 and existing AVR/F401 targets; run shared host protocol/storage checks.
 - [ ] Physical USB upload/recovery and GUI reconnect testing.
 - [ ] Scope all outputs: phase/skew, dense patterns/high RPM, USB traffic jitter.
-- [ ] Check pot range, sweep/compression, settings persistence and save pause/restart.
+- [ ] Check pot range, sweep/compression, settings persistence and save pause/restart,
+      excluding the deferred dynamic amplitude retention issue.
 
 ## Pre-existing issue — dynamic amplitude (deferred software and firmware fixes)
 
 Application changes are outside the current firmware-only scope. The GUI packet
 correction and AVR persistence changes have been reverted. Earlier settings
-retention results above do not establish dynamic amplitude retention.
+retention results above do not establish dynamic amplitude retention. Ignore this
+known issue for all current board validation; it is not a board acceptance
+requirement. The work and tests below are deferred until this issue is revisited.
 
 - [ ] Future application work: correct the dynamic flag to byte 17 without
       overwriting compression offset, then build and verify the GUI package.
@@ -145,14 +154,15 @@ retention results above do not establish dynamic amplitude retention.
 - [ ] Duemilanove/Diecimila ATmega328: complete the procedure below.
 - [ ] F401 Black Pill: complete the procedure below.
 - [ ] ESP32-C3 Super Mini: complete the procedure below.
-- [ ] F411, when implemented: repeat the procedure before marking it supported.
+- [ ] F411, when implemented: repeat the procedure when this issue is revisited.
 
 ESP32-C3 bench status: the user tested the downloaded AppImage and reported the
 setting lost after reset/power cycling. The GUI packet defect remains present;
 this test does not establish a separate ESP32 flash-storage defect. Keep the
 issue open and defer the following bench procedure until fixes are implemented.
 
-Procedure for each board (record firmware/GUI revision and measured results):
+Deferred procedure for each board, after future fixes (record firmware/GUI
+revision and measured results):
 
 1. Enable compression, set a nonzero offset (including 359 degrees), then enable
    Dynamic amplitude. Read configuration back or reconnect the GUI and confirm
