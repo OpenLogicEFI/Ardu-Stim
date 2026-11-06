@@ -22,6 +22,7 @@
 #define __COMMS_H__
  
 #include <Arduino.h>
+extern volatile uint8_t output_invert_mask;
 /* Structures */
 
 /* Prototypes */

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <vector>
+#include <string>
 #include <string.h>
 using byte = uint8_t;
 #define PROGMEM
@@ -12,14 +13,22 @@ inline uint16_t word(uint8_t high, uint8_t low) { return (uint16_t(high) << 8) |
 inline void noInterrupts() {}
 inline void interrupts() {}
 inline uint32_t micros() { return 1234; }
+extern unsigned long testDelayMilliseconds;
+extern void (*testDelayHook)();
+inline void delay(unsigned long milliseconds) {
+  testDelayMilliseconds += milliseconds;
+  if (testDelayHook) { testDelayHook(); }
+}
 struct TestSerial {
   std::vector<uint8_t> input, output;
+  std::vector<std::string> messages;
   size_t offset = 0;
   void begin(unsigned long) {}
   int available() { return int(input.size() - offset); }
   int read() { return offset < input.size() ? input[offset++] : -1; }
   void write(uint8_t v) { output.push_back(v); }
   template<typename T> void print(T) {}
+  void println(const char *message) { messages.push_back(message); }
   template<typename T> void println(T) {}
   void receive(std::vector<uint8_t> bytes) { input = bytes; offset = 0; output.clear(); }
 };

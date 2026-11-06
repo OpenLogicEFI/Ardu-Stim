@@ -6,7 +6,14 @@ extern int testFlushes;
 struct TestEEPROM {
 #if defined(ARDUSTIM_ESP32C3)
   bool failCommit = false;
-  bool begin(int) { memcpy(testBuffer, testFlash, sizeof(testFlash)); return true; }
+  int beginFailures = 0, beginCalls = 0;
+  bool begin(int size) {
+    ++beginCalls;
+    if (size != 32) { return false; }
+    if (beginFailures > 0) { --beginFailures; return false; }
+    memcpy(testBuffer, testFlash, sizeof(testFlash));
+    return true;
+  }
   uint8_t read(int address) { return testBuffer[address]; }
   void write(int address, uint8_t value) { testBuffer[address] = value; }
   bool commit() { if (failCommit) { return false; } ++testFlushes; memcpy(testFlash, testBuffer, sizeof(testFlash)); return true; }

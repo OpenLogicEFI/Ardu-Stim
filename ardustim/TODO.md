@@ -140,6 +140,8 @@ Bench checks (use the pinout confirmed for this board):
 - [x] Compile C3 and existing AVR/F401 targets; run shared host protocol/storage checks.
 - [ ] Physical USB upload/recovery and GUI reconnect testing.
 - [ ] Scope all outputs: phase/skew, dense patterns/high RPM, USB traffic jitter.
+- [ ] Check the storage-initialization failure diagnostic over USB with outputs
+      held low, then reset and confirm normal startup after storage is available.
 - [ ] Check pot range, sweep/compression, settings persistence and save pause/restart,
       excluding the deferred dynamic amplitude retention issue.
 

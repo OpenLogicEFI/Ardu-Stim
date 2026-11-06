@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix="ardustim-test-") as directory:
         "-fsanitize=undefined", "-fno-sanitize-recover=all",
         *flags,
         "-I" + str(root / "test/host"), "-I" + str(root / "ardustim"),
-        str(root / "test/host/f401_test.cpp"), str(root / "ardustim/comms.cpp"),
+        str(root / "test/host/protocol_storage_test.cpp"), str(root / "ardustim/comms.cpp"),
         "-x", "c++", str(root / "ardustim/storage.ino"), "-o", str(binary),
     ], check=True)
     subprocess.run([str(binary)], check=True)

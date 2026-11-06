@@ -14,3 +14,6 @@
 
 void loadConfig();
 void saveConfig();
+#if defined(ARDUSTIM_ESP32C3)
+void initializeStorage();
+#endif

@@ -130,13 +130,18 @@ wheels Wheels[MAX_WHEELS] = {
 /* Initialization */
 void setup() {
 #if defined(ARDUSTIM_ESP32C3)
-  // ESP32 EEPROM emulation requires an allocated RAM buffer before any reads.
-  if (!EEPROM.begin(32)) { while (true) { delay(1000); } }
+  serialSetup();
+  backendSetup(); // Keep outputs low and the timer paused until storage is ready.
+  initializeStorage(); // Allocate the EEPROM buffer before reading any settings.
 #endif
   loadConfig();
+#if !defined(ARDUSTIM_ESP32C3)
   serialSetup();
+#endif
 
-#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+#if defined(ARDUSTIM_ESP32C3)
+  // Backend already initialized before storage; its timer is still paused.
+#elif defined(ARDUSTIM_F401)
   backendSetup();
 #else
   cli(); // stop interrupts

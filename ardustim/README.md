@@ -90,7 +90,7 @@ settings. Reflashing with a full-chip erase clears the stored settings.
 ## Verification
 
 ```sh
-pio run -e blackpill_f401cc -e uno -e nano -e diecimilaatmega328
+pio run -e blackpill_f401cc -e esp32c3_supermini -e uno -e nano -e diecimilaatmega328
 python3 test/run_host_tests.py
 git diff --check
 ```
@@ -106,6 +106,12 @@ check restart counter/alarm/reload state, pending-event clearing, save/restart,
 and F401 pending-SysTick timestamps and interrupt-mask restoration. Serial tests
 cover stop-before-publication for packet, direct and next/previous wheel changes,
 and verify that RPM-only edits do not restart the timer.
+The shared protocol/storage suite is `test/host/protocol_storage_test.cpp`.
+It also checks legacy `r` sweep packets (three low-byte-first 16-bit values),
+inversion toggles, and C3 storage initialization failure diagnostics. The `c`
+configuration packet remains unchanged. Host tests do not compile `ardustim.ino`;
+run the PlatformIO command above as well to compile the complete firmware for
+all five targets. Hardware timing and USB recovery still require bench tests.
 
 For the first board test, use a scope or logic analyzer on PB0-PB2:
 
@@ -179,6 +185,11 @@ on different outputs have a small inter-write skew. No Wi-Fi/Bluetooth stacks
 are started. The interrupt and pattern tables are flash-backed, not IRAM-safe.
 
 Settings use a 32-byte EEPROM emulation buffer with one commit per changed save.
+USB serial and the paused output backend initialize before settings are read.
+If storage initialization fails, outputs remain low and USB serial reports the
+failure once per second. Reset the board to retry; normal controls and pattern
+generation only start after storage initializes successfully. The firmware does
+not erase settings to recover from this error.
 Outputs pause low during commit and restart at sample zero; unchanged saves do
 not pause. A failed commit remains pending for the next Save. Saving is not a
 power-loss-safe transaction and may delay GUI responses. Do not add runtime

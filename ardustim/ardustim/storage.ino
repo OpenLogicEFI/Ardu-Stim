@@ -7,6 +7,22 @@
 #if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
 #include "pattern_backend.h"
 
+#if defined(ARDUSTIM_ESP32C3)
+void initializeStorage()
+{
+  // Serial and the paused output backend must be initialized before this call.
+  // Never load settings or generate a pattern from an unavailable NVS buffer.
+  if (EEPROM.begin(32)) { return; }
+  // This core can retain an NVS handle after a failed begin(). Do not repeatedly
+  // allocate handles; report the fault until the user resets to retry startup.
+  while (true)
+  {
+    Serial.println("Settings storage initialization failed; reset the board to retry.");
+    delay(1000);
+  }
+}
+#endif
+
 // Buffer the entire save and erase/program flash only once if anything changed.
 static bool storageChanged = false;
 static void updateStorage(int address, uint8_t value)

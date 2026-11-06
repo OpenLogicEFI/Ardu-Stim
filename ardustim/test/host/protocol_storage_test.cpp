@@ -11,6 +11,13 @@
 #include "pattern_backend.h"
 
 TestSerial Serial;
+unsigned long testDelayMilliseconds = 0;
+void (*testDelayHook)() = nullptr;
+#if defined(ARDUSTIM_ESP32C3)
+static void stopAfterTwoMessages() {
+  if (testDelayMilliseconds == 2000) { throw 1; }
+}
+#endif
 TestEEPROM EEPROM;
 uint8_t testFlash[8192], testBuffer[8192];
 int testFlushes = 0, saveBegins = 0, saveEnds = 0, timingUpdates = 0;
@@ -22,7 +29,7 @@ struct status currentStatus;
 wheels Wheels[MAX_WHEELS] = {{"test", nullptr, 1.0f, 4, 360}};
 volatile uint16_t edge_counter = 0, new_OCR1A = 0;
 volatile uint32_t cycleDuration = 0, cycleStartTime = 0;
-uint8_t output_invert_mask = 0;
+volatile uint8_t output_invert_mask = 0;
 void reset_new_OCR1A(uint32_t) { ++timingUpdates; }
 void backendStop()
 {
@@ -84,7 +91,20 @@ int main()
   memset(testFlash, 255, sizeof(testFlash));
   testFlash[99] = 42; // Unrelated data in the emulated EEPROM must survive.
 #if defined(ARDUSTIM_ESP32C3)
-  EEPROM.begin(32);
+  EEPROM.beginFailures = 1;
+  testDelayHook = stopAfterTwoMessages;
+  bool waitingForReset = false;
+  try { initializeStorage(); }
+  catch (int) { waitingForReset = true; }
+  testDelayHook = nullptr;
+  assert(waitingForReset && EEPROM.beginCalls == 1 && testDelayMilliseconds == 2000);
+  assert(Serial.messages.size() == 2);
+  assert(Serial.messages[0] == "Settings storage initialization failed; reset the board to retry.");
+  assert(Serial.messages[1] == Serial.messages[0]);
+  assert(testFlushes == 0 && saveBegins == 0 && saveEnds == 0);
+  initializeStorage(); // Simulated reset: success must not delay or log an error.
+  assert(EEPROM.beginCalls == 2 && testDelayMilliseconds == 2000);
+  assert(Serial.messages.size() == 2);
   assert(patternPeriodTicks(10000000, 1.0f, 3000) == 1667);
 #endif
   loadConfig();
@@ -165,10 +185,20 @@ int main()
   commandParser();
   assert(patternStops == 4 && patternStarts == 4); // Invalid wheel cannot stop output.
 
-  Serial.receive({'r', 0x01, 0x23, 0x23, 0x45, 0x03, 0x21});
+  // Legacy AVR sweep packets carry each 16-bit value low byte first.
+  Serial.receive({'r', 0x23, 0x01, 0x45, 0x23, 0x21, 0x03});
   commandParser();
   assert(config.sweep_low_rpm == 0x0123 && config.sweep_high_rpm == 0x2345);
   assert(config.sweep_interval == 0x0321 && config.mode == LINEAR_SWEPT_RPM);
+
+  toggle_invert_primary_cb();
+  assert(output_invert_mask == 1);
+  toggle_invert_secondary_cb();
+  assert(output_invert_mask == 3);
+  toggle_invert_primary_cb();
+  assert(output_invert_mask == 2);
+  toggle_invert_secondary_cb();
+  assert(output_invert_mask == 0);
 
   puts("Timing, GPIO mapping, serial protocol and buffered storage checks passed.");
 }

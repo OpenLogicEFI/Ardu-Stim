@@ -150,13 +150,14 @@ void commandParser()
 
     case 'r': //Set the high and low RPM for sweep mode
       config.mode = LINEAR_SWEPT_RPM;
-      while(Serial.available() < 6) {} //Wait for 4 bytes representing the new low and high RPMs
+      while(Serial.available() < 6) {} // Three 16-bit values: low/high RPM and interval
 
-      // Read explicitly in wire order; C++ argument evaluation order varies by CPU.
+      // Preserve the AVR wire protocol: low byte first. The original nested
+      // reads relied on AVR GCC evaluating the second word() argument first.
       for (uint8_t i = 0; i < 3; ++i)
       {
-        const uint8_t high = Serial.read();
         const uint8_t low = Serial.read();
+        const uint8_t high = Serial.read();
         const uint16_t value = word(high, low);
         if (i == 0) { config.sweep_low_rpm = value; }
         else if (i == 1) { config.sweep_high_rpm = value; }
@@ -211,7 +212,6 @@ uint16_t freeRam () {
 //! Inverts the polarity of the primary output signal
 void toggle_invert_primary_cb()
 {
-  extern uint8_t output_invert_mask;
   output_invert_mask ^= 0x01; /* Flip crank invert mask bit */
 
 }
@@ -219,7 +219,6 @@ void toggle_invert_primary_cb()
 //! Inverts the polarity of the secondary output signal
 void toggle_invert_secondary_cb()
 {
-  extern uint8_t output_invert_mask;
   output_invert_mask ^= 0x02; /* Flip cam invert mask bit */
 }
 
