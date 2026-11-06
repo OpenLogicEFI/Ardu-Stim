@@ -27,6 +27,9 @@
 #include "wheel_defs.h"
 #include "platform_compat.h"
 #include <math.h>
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+#include "pattern_backend.h"
+#endif
 #if defined(__AVR__)
 #include <util/delay.h>
 #endif
@@ -38,13 +41,19 @@ extern wheels Wheels[];
 extern volatile bool normal;
 extern volatile uint16_t edge_counter;
 extern volatile uint16_t new_OCR1A;
-#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
-extern volatile uint32_t cycleDuration;
-extern volatile uint32_t cycleStartTime;
-#endif
 
 bool cmdPending;
 byte currentCommand;
+
+static void setWheel(uint8_t wheel)
+{
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+  // Stop before publishing the wheel so no sample uses its predecessor's timing.
+  backendStop();
+#endif
+  config.wheel = wheel;
+  display_new_wheel();
+}
 
 //! Initializes the serial port and sets up the Menu
 /*!
@@ -80,6 +89,9 @@ void commandParser()
       }
       if (receivedConfig.wheel >= MAX_WHEELS || receivedConfig.mode >= MAX_MODES) { break; }
       const bool wheelChanged = receivedConfig.wheel != config.wheel;
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+      if (wheelChanged) { backendStop(); }
+#endif
       // Publish a complete packet: the timer must never see a partial wheel/config.
       noInterrupts();
       config = receivedConfig;
@@ -164,8 +176,7 @@ void commandParser()
       tmp_wheel = Serial.read();
       if(tmp_wheel < MAX_WHEELS)
       {
-        config.wheel = tmp_wheel;
-        display_new_wheel();
+        setWheel(tmp_wheel);
       }
       break;
 
@@ -214,15 +225,13 @@ void toggle_invert_secondary_cb()
 
 void display_new_wheel()
 {
-#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
-  noInterrupts();
-#endif
   reset_new_OCR1A(currentStatus.rpm);
-  edge_counter = 0; // Reset to beginning of the wheel pattern */
 #if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
-  cycleDuration = 0;
-  cycleStartTime = micros();
-  interrupts();
+  // Callers have stopped the timer before publishing the new wheel. Start
+  // clears pending events and loads the new period, including F401's preload.
+  backendStart();
+#else
+  edge_counter = 0;
 #endif
 }
 
@@ -235,12 +244,7 @@ void display_new_wheel()
  */
 void select_next_wheel_cb()
 {
-  if (config.wheel == (MAX_WHEELS-1))
-    config.wheel = 0;
-  else 
-    config.wheel++;
-  
-  display_new_wheel();
+  setWheel(config.wheel == (MAX_WHEELS-1) ? 0 : config.wheel + 1);
 }
 
 //
@@ -252,10 +256,5 @@ void select_next_wheel_cb()
  */
 void select_previous_wheel_cb()
 {
-  if (config.wheel == 0)
-    config.wheel = MAX_WHEELS-1;
-  else 
-    config.wheel--;
-  
-  display_new_wheel();
+  setWheel(config.wheel == 0 ? MAX_WHEELS-1 : config.wheel - 1);
 }

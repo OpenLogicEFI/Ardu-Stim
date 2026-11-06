@@ -19,6 +19,10 @@ Bench results:
 
 Bench checks:
 
+- [ ] Recheck wheel transitions after the timer restart fix, including sparse
+      low-RPM to dense high-RPM patterns; verify no old-period samples remain.
+- [ ] Check compression timing across SysTick boundaries after the F401
+      pending-tick timestamp fix; confirm no approximately 1 ms timestamp jumps.
 - [x] Measure PB0 crank, PB1 CAM1 and PB2 CAM2 signal levels and timing with a
       scope or logic analyzer. With BMW N20, CAM1 and CAM2 should match.
 - [ ] Check 60-2 at 3000 RPM: approximately 166.67 us per table sample and 20 ms
@@ -119,6 +123,8 @@ Bench checks (use the pinout confirmed for this board):
       excluding the deferred dynamic amplitude setting.
 - [ ] Check output behavior during a changed save against the documented storage
       behavior. Confirm outputs and USB/GUI controls recover afterward.
+- [ ] Recheck wheel transitions after the timer restart fix; scope sparse
+      low-RPM to dense high-RPM changes and verify no old-period samples remain.
 - [ ] Repeat an unchanged save and check that it skips unnecessary flash writes
       and output interruptions.
 - [ ] Reconnect USB and restart the GUI. Check that settings load and the

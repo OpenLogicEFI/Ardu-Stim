@@ -63,6 +63,8 @@ void backendSetRPM(float scaler, uint32_t rpm)
 void backendStart()
 {
   ESP_ERROR_CHECK(timer_pause(TIMER_GROUP_0, TIMER_0));
+  ESP_ERROR_CHECK(timer_disable_intr(TIMER_GROUP_0, TIMER_0));
+  timer_group_clr_intr_status_in_isr(TIMER_GROUP_0, TIMER_0);
   edge_counter = 0;
   cycleDuration = 0;
   cycleStartTime = micros();
@@ -70,9 +72,23 @@ void backendStart()
   ESP_ERROR_CHECK(timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0));
   ESP_ERROR_CHECK(timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, deadline));
   ESP_ERROR_CHECK(timer_set_alarm(TIMER_GROUP_0, TIMER_0, TIMER_ALARM_EN));
+  ESP_ERROR_CHECK(timer_enable_intr(TIMER_GROUP_0, TIMER_0));
   ESP_ERROR_CHECK(timer_start(TIMER_GROUP_0, TIMER_0));
   running = true;
 }
+
+void backendStop()
+{
+  if (ready)
+  {
+    ESP_ERROR_CHECK(timer_pause(TIMER_GROUP_0, TIMER_0));
+    ESP_ERROR_CHECK(timer_disable_intr(TIMER_GROUP_0, TIMER_0));
+    backendWriteOutputs(0);
+  }
+  running = false;
+}
+
+uint32_t backendMicros() { return micros(); }
 
 void backendPollADC()
 {
@@ -103,9 +119,7 @@ void backendEndSave()
 {
   if (resumeAfterSave)
   {
-    timer_group_clr_intr_status_in_isr(TIMER_GROUP_0, TIMER_0);
     backendStart();
-    ESP_ERROR_CHECK(timer_enable_intr(TIMER_GROUP_0, TIMER_0));
   }
 }
 #endif

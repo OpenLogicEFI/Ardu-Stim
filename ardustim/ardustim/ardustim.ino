@@ -293,8 +293,14 @@ ISR(TIMER1_COMPA_vect)
   if (edge_counter == Wheels[config.wheel].wheel_max_edges) 
   {
     edge_counter = 0;
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+    const uint32_t now = backendMicros();
+    cycleDuration = now - cycleStartTime;
+    cycleStartTime = now;
+#else
     cycleDuration = micros() - cycleStartTime;
     cycleStartTime = micros();
+#endif
   }
   /* The tables are in flash so we need pgm_read_byte() */
 
@@ -410,7 +416,11 @@ uint16_t calculateCurrentCrankAngle()
 {
   if(cycleDuration == 0) { return 0; }
 
+#if defined(ARDUSTIM_F401) || defined(ARDUSTIM_ESP32C3)
+  uint32_t cycleTime = backendMicros() - cycleStartTime;
+#else
   uint32_t cycleTime = micros() - cycleStartTime;
+#endif
   if( Wheels[config.wheel].wheel_degrees == 720 ) { cycleTime = cycleTime * 2; } 
   
   uint16_t tmpCrankAngle = ((cycleTime * 360U) / cycleDuration);

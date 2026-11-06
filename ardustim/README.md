@@ -66,12 +66,19 @@ settings. Reflashing with a full-chip erase clears the stored settings.
   a new value takes effect after the next reload boundary. Its IRQ has higher
   priority than USB. PB0-PB2 change together with a masked BSRR write that leaves
   unrelated GPIO pins alone.
+  Cycle timestamps use a pending-SysTick-aware snapshot, including when TIM2
+  prevents the millisecond interrupt from running at a rollover. The timestamp
+  reader restores the caller's interrupt mask and leaves SysTick pending.
 - `ardustim/pattern_timing.h`: timer period calculation and GPIO bit mapping.
 - `ardustim/ardustim.ino`: shared wheel tables, pattern advancement, sweep and
   compression logic; AVR register setup stays in the AVR branch.
 - `ardustim/comms.cpp`: existing serial protocol. Configuration packets are
   published together and wheel changes recalculate timing. Sweep words are read
   in explicit byte order to work across AVR and ARM compilers.
+  On F401 and ESP32-C3, wheel changes stop the timer before publishing the wheel,
+  drive outputs low, clear pending timer events, and restart at sample zero with
+  the new period. The transition intentionally resets phase; ordinary RPM edits
+  preserve phase and retain the backend's buffered/scheduled update behavior.
 - `ardustim/storage.ino`: AVR EEPROM updates or one buffered STM32 flash write.
   F401 also restores base RPM and persists the dynamic compression setting.
 - `platformio.ini`: pins the STM32 platform to 19.7.1 (STM32duino 2.12.0), enables
@@ -94,6 +101,11 @@ binary configuration layout and byte order, invalid wheel/mode rejection,
 timing refresh after configuration changes, one-write settings saves, unchanged
 save suppression and settings reload. They use the undefined-behavior sanitizer.
 They do not simulate the STM32 peripheral hardware or prove interrupt latency.
+Additional tests compile both production backends against peripheral mocks to
+check restart counter/alarm/reload state, pending-event clearing, save/restart,
+and F401 pending-SysTick timestamps and interrupt-mask restoration. Serial tests
+cover stop-before-publication for packet, direct and next/previous wheel changes,
+and verify that RPM-only edits do not restart the timer.
 
 For the first board test, use a scope or logic analyzer on PB0-PB2:
 
@@ -202,3 +214,40 @@ Future work must correct the GUI packet, add AVR persistence, and bench-test
 both checkbox states with compression offset retained across Save, reconnect,
 reset and full power cycling on every supported board. These checks remain
 pending in TODO.md. No end-to-end dynamic amplitude retention fix is claimed.
+
+### Incomplete serial commands stall controls — unresolved
+
+`comms.cpp` waits indefinitely for the remaining bytes of configuration (`c`),
+sweep (`r`) and wheel (`S`) commands. A truncated command or disconnect during
+receipt can stall the main loop. Timer outputs continue, but potentiometer,
+sweep, compression updates and further command processing stop progressing.
+A future fix needs bounded packet reception and recovery after incomplete input.
+
+### Two-cylinder compression reads beyond its table — unresolved
+
+`calculateCurrentCrankAngle()` permits exactly 360 degrees. Two-cylinder
+compression divides that angle by two and reads index 180 of the 180-entry
+`sin_100_180` table, whose last valid index is 179. This can produce an incorrect
+compression modifier. A host test against the shared implementation reproduced
+the out-of-bounds read with the undefined-behavior sanitizer. A future fix should
+normalize angles to 0–359 degrees before lookup and check the boundary cases.
+
+### Sweep timing fails near micros rollover — unresolved
+
+The sweep test compares `micros()` against `sweep_time_counter + sweep_interval`.
+That addition can wrap, causing steps to run too quickly near the roughly
+71-minute microsecond-counter rollover. A host reproduction stepped after only
+16 microseconds with a 1,000-microsecond interval. A future fix should compare
+unsigned elapsed time and test both sides of rollover.
+
+### Zero compression threshold can divide by zero — unresolved
+
+With dynamic compression enabled, base RPM zero and `compressionRPM` zero,
+`calculateCompressionModifier()` divides by zero. Serial configuration and
+settings loading do not reject a zero threshold. The GUI normally limits this
+field to at least 20 RPM, but firmware must also validate it. A host sanitizer
+test reproduced the division by zero. A future fix needs input validation and a
+guard in the calculation, including zero-pot and stored-settings cases.
+
+These shared issues predate the MCU additions and remain unfixed. The board
+timing fixes do not resolve them.

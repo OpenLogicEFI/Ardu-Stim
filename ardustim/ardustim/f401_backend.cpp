@@ -17,6 +17,30 @@ static volatile uint32_t nextPeriodTicks;
 static bool running = false;
 static bool resumeAfterSave = false;
 
+uint32_t f401Micros()
+{
+  // TIM2 and SysTick both have priority 0. A rollover can be pending while
+  // TIM2 runs, before HAL_GetTick() has advanced. Snapshot it with IRQs masked
+  // and account for that pending millisecond without consuming the interrupt.
+  const uint32_t interruptMask = __get_PRIMASK();
+  __disable_irq();
+  uint32_t milliseconds = HAL_GetTick();
+  uint32_t counter;
+  // VAL is zero for one core clock at rollover, before the reload. Sample the
+  // reloaded counter so a pending tick cannot be counted as two milliseconds.
+  do { counter = SysTick->VAL; } while (counter == 0);
+  const uint32_t ticksPerMillisecond = SysTick->LOAD + 1U;
+  if (SCB->ICSR & SCB_ICSR_PENDSTSET_Msk)
+  {
+    ++milliseconds;
+    // Rollover may have followed the first VAL read.
+    do { counter = SysTick->VAL; } while (counter == 0);
+  }
+  __set_PRIMASK(interruptMask);
+  return milliseconds * 1000U +
+         ((ticksPerMillisecond - counter) * 1000U) / ticksPerMillisecond;
+}
+
 static void timerCallback()
 {
   patternTick();
@@ -58,7 +82,7 @@ void f401Start()
   patternTimer->pause(); // Also suppress interrupts from the forced update below
   edge_counter = 0;
   cycleDuration = 0;
-  cycleStartTime = micros();
+  cycleStartTime = f401Micros();
   patternTimer->setOverflow(nextPeriodTicks, TICK_FORMAT);
   patternTimer->setCount(0);
   patternTimer->refresh();
@@ -66,6 +90,16 @@ void f401Start()
   NVIC_ClearPendingIRQ(TIM2_IRQn);
   patternTimer->resume();
   running = true;
+}
+
+void f401Stop()
+{
+  if (patternTimer != nullptr)
+  {
+    patternTimer->pause();
+    f401WriteOutputs(0);
+  }
+  running = false;
 }
 
 void f401PollADC()

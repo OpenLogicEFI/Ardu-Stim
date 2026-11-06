@@ -8,11 +8,15 @@
 #include "storage.h"
 #include "EEPROM.h"
 #include "pattern_timing.h"
+#include "pattern_backend.h"
 
 TestSerial Serial;
 TestEEPROM EEPROM;
 uint8_t testFlash[8192], testBuffer[8192];
 int testFlushes = 0, saveBegins = 0, saveEnds = 0, timingUpdates = 0;
+int patternStops = 0, patternStarts = 0;
+uint8_t wheelAtStop = 0;
+bool patternStopped = false;
 configTable config;
 struct status currentStatus;
 wheels Wheels[MAX_WHEELS] = {{"test", nullptr, 1.0f, 4, 360}};
@@ -20,6 +24,21 @@ volatile uint16_t edge_counter = 0, new_OCR1A = 0;
 volatile uint32_t cycleDuration = 0, cycleStartTime = 0;
 uint8_t output_invert_mask = 0;
 void reset_new_OCR1A(uint32_t) { ++timingUpdates; }
+void backendStop()
+{
+  wheelAtStop = config.wheel;
+  patternStopped = true;
+  ++patternStops;
+}
+void backendStart()
+{
+  assert(patternStopped);
+  patternStopped = false;
+  ++patternStarts;
+  edge_counter = 0;
+  cycleDuration = 0;
+  cycleStartTime = micros();
+}
 #if defined(ARDUSTIM_ESP32C3)
 void backendBeginSave() { ++saveBegins; }
 void backendEndSave() { ++saveEnds; }
@@ -106,9 +125,11 @@ int main()
   incoming.fixed_rpm = 0x1234;
   edge_counter = 999;
   cycleDuration = 999;
+  const uint8_t oldWheel = config.wheel;
   sendConfig(incoming);
   assert(config.fixed_rpm == 0x1234 && config.wheel == 6 && edge_counter == 0);
   assert(cycleDuration == 0 && timingUpdates == 1);
+  assert(patternStops == 1 && patternStarts == 1 && wheelAtStop == oldWheel);
   Serial.receive({'C'});
   commandParser();
   assert(Serial.output.size() == 18);
@@ -128,6 +149,21 @@ int main()
   sendConfig(incoming);
   assert(config.fixed_rpm == 5000 && edge_counter == 77 && cycleDuration == 88);
   assert(timingUpdates == 1); // An RPM edit must not restart the wheel phase.
+  assert(patternStops == 1 && patternStarts == 1);
+
+  Serial.receive({'S', 0});
+  commandParser();
+  assert(config.wheel == 0 && wheelAtStop == 6);
+  assert(patternStops == 2 && patternStarts == 2 && edge_counter == 0);
+  select_previous_wheel_cb();
+  assert(config.wheel == MAX_WHEELS-1 && wheelAtStop == 0);
+  Serial.receive({'X'});
+  commandParser();
+  assert(config.wheel == 0 && wheelAtStop == MAX_WHEELS-1);
+  assert(patternStops == 4 && patternStarts == 4);
+  Serial.receive({'S', MAX_WHEELS});
+  commandParser();
+  assert(patternStops == 4 && patternStarts == 4); // Invalid wheel cannot stop output.
 
   Serial.receive({'r', 0x01, 0x23, 0x23, 0x45, 0x03, 0x21});
   commandParser();

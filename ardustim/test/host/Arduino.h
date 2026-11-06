@@ -24,3 +24,12 @@ struct TestSerial {
   void receive(std::vector<uint8_t> bytes) { input = bytes; offset = 0; output.clear(); }
 };
 extern TestSerial Serial;
+
+#if defined(ARDUSTIM_BACKEND_TEST)
+constexpr int OUTPUT = 1, INPUT = 0, INPUT_ANALOG = 2, ADC_11db = 3;
+constexpr int PB0 = 0, PB1 = 1, PB2 = 2, PA1 = 3;
+inline void pinMode(int, int) {}
+inline void analogReadResolution(int) {}
+inline void analogSetPinAttenuation(int, int) {}
+inline uint16_t analogRead(int) { return 123; }
+#endif

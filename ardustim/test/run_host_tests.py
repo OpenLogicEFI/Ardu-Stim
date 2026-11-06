@@ -19,3 +19,12 @@ with tempfile.TemporaryDirectory(prefix="ardustim-test-") as directory:
         "-x", "c++", str(root / "ardustim/storage.ino"), "-o", str(binary),
     ], check=True)
     subprocess.run([str(binary)], check=True)
+    backend_binary = Path(directory) / (target + "-backend-test")
+    subprocess.run([
+        os.environ.get("CXX", "c++"), "-std=c++11", "-Wall", "-Wextra", "-Werror",
+        "-fsanitize=undefined", "-fno-sanitize-recover=all",
+        *flags, "-DARDUSTIM_BACKEND_TEST",
+        "-I" + str(root / "test/host"), "-I" + str(root / "ardustim"),
+        str(root / "test/host/backend_test.cpp"), "-o", str(backend_binary),
+    ], check=True)
+    subprocess.run([str(backend_binary)], check=True)
